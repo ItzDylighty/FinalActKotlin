@@ -1,0 +1,93 @@
+package com.example.mykot
+/*
+This File allows the User to add, check and delete current item on the list.
+But for now those added item i still doesnt save but for future improvement it will.
+ */
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddItemScreen(navController: NavController, listName: String) {
+    var newItem by remember { mutableStateOf("") }
+    var extraDetail by remember { mutableStateOf("") }
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showSnackbar by remember { mutableStateOf(false) }
+
+    if (showSnackbar) {
+        LaunchedEffect(snackbarHostState) {
+            snackbarHostState.showSnackbar("Added '$newItem' to $listName")
+            showSnackbar = false
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Add Item to $listName") },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Surface(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                OutlinedTextField(
+                    value = newItem,
+                    onValueChange = { newItem = it },
+                    label = { Text("Item Name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                OutlinedTextField(
+                    value = extraDetail,
+                    onValueChange = { extraDetail = it },
+                    label = {
+                        Text(
+                            when (listName) {
+                                "Budget List" -> "Price"
+                                "Food List" -> "Target Price"
+                                "Household List" -> "Type / Category"
+                                else -> "Detail"
+                            }
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        showSnackbar = true
+                        navController.popBackStack()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Add Item")
+                }
+            }
+        }
+    }
+}
