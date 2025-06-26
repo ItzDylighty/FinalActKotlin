@@ -1,0 +1,209 @@
+package com.example.mykot
+/*
+Allows the user to view listed items, check out the purchase item,update, search, delete, and
+see the total budget list.
+ */
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.navigation.NavController
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun GroceryDetailScreen(navController: NavController, listName: String) {
+    val isBudgetList = listName == "Budget List"
+    val isFoodList = listName == "Food List"
+    val isHouseholdList = listName == "Household List"
+
+    val initialItems = when (listName) {
+        "Budget List" -> listOf("Rice" to "250", "Canned Goods" to "180", "Vegetables" to "120")
+        "Food List" -> listOf("Chicken Breast" to "350", "Milk" to "80", "Eggs" to "160")
+        "Household List" -> listOf("Detergent" to "Cleaning", "Toilet Paper" to "Bathroom", "Dish Soap" to "Kitchen")
+        else -> emptyList()
+    }
+
+    val items = remember { mutableStateListOf<Pair<String, String>>().apply { addAll(initialItems) } }
+    val checkedStates = remember {
+        if (isFoodList || isHouseholdList) {
+            mutableStateMapOf<String, Boolean>().apply {
+                initialItems.forEach { put(it.first, false) }
+            }
+        } else null
+    }
+
+    var searchQuery by remember { mutableStateOf("") }
+    val filteredItems = items.filter { it.first.contains(searchQuery, ignoreCase = true) }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    var messageToShow by remember { mutableStateOf<String?>(null) }
+
+    var editingItem by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var editedName by remember { mutableStateOf("") }
+    var editedDetail by remember { mutableStateOf("") }
+
+    messageToShow?.let { message ->
+        LaunchedEffect(message) {
+            snackbarHostState.showSnackbar(message)
+            messageToShow = null
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text(listName) },
+                navigationIcon = {
+                    IconButton(onClick = { navController.popBackStack() }) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                )
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { navController.navigate("addItem/$listName") }) {
+                Text("+")
+            }
+        },
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = MaterialTheme.colorScheme.background
+    ) { padding ->
+        Surface(
+            modifier = Modifier
+                .padding(padding)
+                .fillMaxSize(),
+            color = MaterialTheme.colorScheme.background
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    label = { Text("Search") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                LazyColumn {
+                    items(filteredItems) { (name, detail) ->
+                        OutlinedCard(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                        ) {
+                            Column(modifier = Modifier.padding(16.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Column {
+                                        Text(text = name, style = MaterialTheme.typography.titleMedium)
+                                        when {
+                                            isBudgetList -> Text("₱$detail")
+                                            isFoodList -> Text("Target Price: ₱$detail")
+                                            isHouseholdList -> Text("Type: $detail")
+                                        }
+                                    }
+
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        if ((isFoodList || isHouseholdList) && checkedStates != null) {
+                                            Checkbox(
+                                                checked = checkedStates[name] ?: false,
+                                                onCheckedChange = { isChecked ->
+                                                    checkedStates[name] = isChecked
+                                                    if (isChecked) messageToShow = "Marked '$name' as Purchased"
+                                                }
+                                            )
+                                        }
+
+                                        IconButton(onClick = {
+                                            editingItem = name to detail
+                                            editedName = name
+                                            editedDetail = detail
+                                        }) {
+                                            Icon(Icons.Default.Edit, contentDescription = "Edit")
+                                        }
+
+                                        IconButton(onClick = {
+                                            items.remove(Pair(name, detail))
+                                            checkedStates?.remove(name)
+                                            messageToShow = "Item Deleted"
+                                        }) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Delete")
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (isBudgetList) {
+                        val total = filteredItems.sumOf { it.second.toDoubleOrNull() ?: 0.0 }
+                        item {
+                            Text(
+                                "Total: ₱%.2f".format(total),
+                                style = MaterialTheme.typography.titleLarge,
+                                modifier = Modifier.padding(top = 16.dp)
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (editingItem != null) {
+                AlertDialog(
+                    onDismissRequest = { editingItem = null },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            items.remove(editingItem!!)
+                            items.add(editedName to editedDetail)
+                            checkedStates?.apply {
+                                remove(editingItem!!.first)
+                                put(editedName, false)
+                            }
+                            messageToShow = "Item Updated"
+                            editingItem = null
+                        }) {
+                            Text("Save")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { editingItem = null }) {
+                            Text("Cancel")
+                        }
+                    },
+                    title = { Text("Edit Item") },
+                    text = {
+                        Column {
+                            OutlinedTextField(
+                                value = editedName,
+                                onValueChange = { editedName = it },
+                                label = { Text("Item Name") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(
+                                value = editedDetail,
+                                onValueChange = { editedDetail = it },
+                                label = { Text("Detail") },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                )
+            }
+        }
+    }
+}
